@@ -1,31 +1,27 @@
 """
-Test suite for towers.py (Solution 3: two-pointer O(nk) construction).
+Test suite for towers_solution2.py (Solution 2: binary search over the
+split point).
 
-Run with:  pytest test_towers.py -v
+Run with:  pytest test-towers_solution2.py -v
 
 Includes three independent oracles:
-  1. An independently-written brute-force recurrence (Solution 1 style).
+  1. An independently-written brute-force recurrence (deliberately simple,
+     never shares code with towers_solution2.py's binary-search logic).
   2. The paper's closed form (Menon, arXiv:2505.12941v5), used only to
-     cross-check the VALUE M(p,n) -- not the move reconstruction, since
-     the paper's own split-point formula was found to be unreliable.
+     cross-check the VALUE M(p,n).
   3. A move-sequence validator that simulates the actual moves and checks
      every rule of the puzzle is obeyed.
-
-Note on binomial coefficients: rather than using a library factorial-based
-routine, coefficients here are built via Pascal's identity
-C(a,b) = C(a-1,b-1) + C(a-1,b) -- pure addition, no multiplication,
-division, or factorial call of any kind.
 """
 
 import math
 import random
 import pytest
-from towers import construct_frame_stewart_matrix, execute_moves, get_solution
+from towers_solution2 import construct_min_moves_matrix, execute_moves, get_solution
 
 
 # ---------------------------------------------------------------------
 # Oracle 1: independent brute-force recurrence (deliberately simple,
-# never shares code with towers.py's two-pointer logic)
+# never shares code with towers_solution2.py's binary-search logic)
 # ---------------------------------------------------------------------
 
 def brute_force_M(n_max, k_max):
@@ -123,7 +119,7 @@ def validate_moves(n, k, moves):
 def test_M_matches_brute_force():
     N, K = 60, 12
     Mb = brute_force_M(N, K)
-    M, _ = construct_frame_stewart_matrix(N, K)
+    M, _ = construct_min_moves_matrix(N, K)
     for p in range(3, K + 1):
         for n in range(0, N + 1):
             assert M[n][p] == Mb[n][p], f"M[{n}][{p}]: {M[n][p]} != {Mb[n][p]}"
@@ -131,7 +127,7 @@ def test_M_matches_brute_force():
 
 def test_M_matches_closed_form_paper_oracle():
     N, K = 200, 15
-    M, _ = construct_frame_stewart_matrix(N, K)
+    M, _ = construct_min_moves_matrix(N, K)
     for p in range(4, K + 1):
         for n in range(0, N + 1):
             assert M[n][p] == closed_form_M(p, n), (
@@ -173,10 +169,28 @@ def test_pascal_binomials_match_stdlib():
 
 
 def test_base_cases():
-    M, x = construct_frame_stewart_matrix(10, 5)
+    M, split = construct_min_moves_matrix(10, 5)
     assert M[0][4] == 0
     assert M[1][4] == 1
     assert M[5][3] == 2 ** 5 - 1
+    assert split[5][3] == 4
+
+
+def test_split_point_is_unimodal_argmin():
+    """Sanity check on the assumption the binary search relies on: for
+    fixed i, j, h(l) = 2*M[l][j] + M[i-l][j-1] really is convex in l, so
+    scanning outward from the binary search's answer never finds a
+    strictly better split point."""
+    N, K = 60, 10
+    M, split = construct_min_moves_matrix(N, K)
+    for j in range(4, K + 1):
+        for i in range(2, N + 1):
+            l = split[i][j]
+            best = 2 * M[l][j] + M[i - l][j - 1]
+            for t in range(1, i):
+                assert 2 * M[t][j] + M[i - t][j - 1] >= best, (
+                    f"split[{i}][{j}]={l} is not optimal: t={t} does better"
+                )
 
 
 if __name__ == "__main__":

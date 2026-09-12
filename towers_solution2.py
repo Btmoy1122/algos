@@ -1,4 +1,17 @@
-def construct_frame_stewart_matrix(n: int, k: int):
+"""
+Towers and Disks (multi-peg Tower of Hanoi), Solution 2: binary search
+over the split point.
+
+M[.][j] is convex in the split point for fixed i, j, so the arg-min can
+be found with a ternary-style binary search instead of a linear scan.
+
+construct_min_moves_matrix(n, k) -> (M, split), O(nk log n) time, O(nk) space
+execute_moves(...)                -> Theta(M[n][k]) time, O(n) space
+get_solution(n, k)                -> (M[n][k], list_of_moves)
+"""
+
+
+def construct_min_moves_matrix(n: int, k: int):
     M = [[0] * (k + 1) for _ in range(n + 1)]
     split = [[0] * (k + 1) for _ in range(n + 1)]
 
@@ -15,18 +28,23 @@ def construct_frame_stewart_matrix(n: int, k: int):
     def h(l, i, j):
         return 2 * M[l][j] + M[i - l][j - 1]
 
-    x = [0] * (k + 1)
-    for j in range(4, k + 1):
-        x[j] = 1
-
     for i in range(2, n + 1):
         for j in range(4, k + 1):
-            if x[j] > i - 1:
-                x[j] = i - 1
-            if x[j] < i - 1 and h(x[j] + 1, i, j) <= h(x[j], i, j):
-                x[j] += 1
-            M[i][j] = 2 * M[x[j]][j] + M[i - x[j]][j - 1]
-            split[i][j] = x[j]
+            low, high = 1, i - 1
+            while high - low >= 2:
+                mid = low + (high - low) // 2
+                value = h(mid, i, j) - h(mid + 1, i, j)
+                if value > 0:
+                    low = mid + 1
+                elif value < 0:
+                    high = mid
+                else:
+                    low, high = mid, mid + 1
+            val1, val2 = h(low, i, j), h(high, i, j)
+            if val1 <= val2:
+                M[i][j], split[i][j] = val1, low
+            else:
+                M[i][j], split[i][j] = val2, high
 
     return M, split
 
@@ -56,7 +74,7 @@ def execute_moves(n, j, source, target, start):
 
 def get_solution(n: int, k: int):
     global M, split, spares, moves
-    M, split = construct_frame_stewart_matrix(n, k)
+    M, split = construct_min_moves_matrix(n, k)
     spares = list(range(2, k))
     moves = []
     execute_moves(n, k, 1, k, 0)

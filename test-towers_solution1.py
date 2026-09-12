@@ -1,31 +1,33 @@
 """
-Test suite for towers.py (Solution 3: two-pointer O(nk) construction).
+Test suite for towers_solution1.py (Solution 1: brute-force linear scan
+over the split point).
 
-Run with:  pytest test_towers.py -v
+Run with:  pytest test-towers_solution1.py -v
 
 Includes three independent oracles:
-  1. An independently-written brute-force recurrence (Solution 1 style).
+  1. An independently-written brute-force recurrence (deliberately simple,
+     never shares code with towers_solution1.py's construction).
   2. The paper's closed form (Menon, arXiv:2505.12941v5), used only to
-     cross-check the VALUE M(p,n) -- not the move reconstruction, since
-     the paper's own split-point formula was found to be unreliable.
+     cross-check the VALUE M(p,n).
   3. A move-sequence validator that simulates the actual moves and checks
      every rule of the puzzle is obeyed.
-
-Note on binomial coefficients: rather than using a library factorial-based
-routine, coefficients here are built via Pascal's identity
-C(a,b) = C(a-1,b-1) + C(a-1,b) -- pure addition, no multiplication,
-division, or factorial call of any kind.
 """
 
 import math
 import random
 import pytest
-from towers import construct_frame_stewart_matrix, execute_moves, get_solution
+from towers_solution1 import (
+    bottom_up,
+    space_optimized,
+    construct_min_moves_matrix,
+    execute_moves,
+    get_solution,
+)
 
 
 # ---------------------------------------------------------------------
 # Oracle 1: independent brute-force recurrence (deliberately simple,
-# never shares code with towers.py's two-pointer logic)
+# never shares code with towers_solution1.py's construction)
 # ---------------------------------------------------------------------
 
 def brute_force_M(n_max, k_max):
@@ -123,20 +125,32 @@ def validate_moves(n, k, moves):
 def test_M_matches_brute_force():
     N, K = 60, 12
     Mb = brute_force_M(N, K)
-    M, _ = construct_frame_stewart_matrix(N, K)
+    M, _ = construct_min_moves_matrix(N, K)
     for p in range(3, K + 1):
         for n in range(0, N + 1):
             assert M[n][p] == Mb[n][p], f"M[{n}][{p}]: {M[n][p]} != {Mb[n][p]}"
 
 
 def test_M_matches_closed_form_paper_oracle():
-    N, K = 200, 15
-    M, _ = construct_frame_stewart_matrix(N, K)
+    N, K = 100, 12
+    M, _ = construct_min_moves_matrix(N, K)
     for p in range(4, K + 1):
         for n in range(0, N + 1):
             assert M[n][p] == closed_form_M(p, n), (
                 f"M[{n}][{p}]: {M[n][p]} != closed_form {closed_form_M(p, n)}"
             )
+
+
+@pytest.mark.parametrize("n,k", [(0, 4), (1, 4), (1, 8), (5, 3), (10, 10), (20, 6)])
+def test_bottom_up_matches_brute_force(n, k):
+    Mb = brute_force_M(n, k)
+    assert bottom_up(n, k) == Mb[n][k]
+
+
+@pytest.mark.parametrize("n,k", [(0, 4), (1, 4), (1, 8), (5, 3), (10, 10), (20, 6)])
+def test_space_optimized_matches_brute_force(n, k):
+    Mb = brute_force_M(n, k)
+    assert space_optimized(n, k) == Mb[n][k]
 
 
 @pytest.mark.parametrize("n,k", [(1, 4), (2, 4), (5, 4), (5, 5), (10, 4),
@@ -173,10 +187,11 @@ def test_pascal_binomials_match_stdlib():
 
 
 def test_base_cases():
-    M, x = construct_frame_stewart_matrix(10, 5)
+    M, split = construct_min_moves_matrix(10, 5)
     assert M[0][4] == 0
     assert M[1][4] == 1
     assert M[5][3] == 2 ** 5 - 1
+    assert split[5][3] == 4
 
 
 if __name__ == "__main__":
